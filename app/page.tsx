@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Send, Zap, Database, Cpu, DollarSign, Clock, Activity, ShieldCheck, BarChart3 } from "lucide-react";
+import { Send, Zap, Database, Cpu, DollarSign, Clock, Activity, ShieldCheck, BarChart3, ExternalLink } from "lucide-react";
 
 type Message = { role: "user" | "ai"; content: string };
 type Metrics = { 
@@ -9,7 +9,13 @@ type Metrics = {
   latency: number; 
   costSaved: boolean; 
   threshold: string | number;
-  tokensEstimated: number;
+  costUsd: number;
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+  tokensSaved: number;
+  traceId: string;
+  traceUrl: string;
 };
 
 export default function ExecutiveCachingHUD() {
@@ -40,16 +46,20 @@ export default function ExecutiveCachingHUD() {
 
       setMessages((prev) => [...prev, { role: "ai", content: data.answer }]);
       
-      const tokenEstimate = Math.floor((userQ.length + data.answer.length) / 4);
-
       setMetrics({
         source: data.source || "GEMINI_API_FRESH",
         latency: data.latencyMs || (endTime - startTime),
         costSaved: data.source !== "GEMINI_API_FRESH" && data.source !== undefined,
         threshold: data.threshold || "N/A",
-        tokensEstimated: tokenEstimate,
+        costUsd: data.cost_usd || 0,
+        promptTokens: data.prompt_tokens || 0,
+        completionTokens: data.completion_tokens || 0,
+        totalTokens: data.tokens_used || 0,
+        tokensSaved: data.tokens_saved || 0,
+        traceId: data.trace_id || "Unavailable",
+        traceUrl: data.trace_url || "#",
       });
-    } catch (error) {
+    } catch {
       setMessages((prev) => [...prev, { role: "ai", content: "Error connecting to AI Routing Layer." }]);
     } finally {
       setLoading(false);
@@ -150,7 +160,7 @@ export default function ExecutiveCachingHUD() {
                       <DollarSign size={12} /> API Cost
                     </div>
                     <div className={`text-sm font-mono font-bold mt-1 ${metrics.costSaved ? "text-emerald-400" : "text-rose-400"}`}>
-                      {metrics.costSaved ? "BYPASSED" : "CHARGED"}
+                      {metrics.costSaved ? "$0.00000 (100% Saved)" : `$${metrics.costUsd.toFixed(5)}`}
                     </div>
                   </div>
                 </div>
@@ -166,9 +176,19 @@ export default function ExecutiveCachingHUD() {
                     <span className="flex items-center gap-1.5 text-slate-500 text-[10px] font-bold uppercase tracking-wider">
                       <BarChart3 size={12} /> Tokens Saved
                     </span>
-                    <span className="font-mono text-sm text-emerald-400">{metrics.costSaved ? `~${metrics.tokensEstimated}` : "0"}</span>
+                    <span className="font-mono text-sm text-emerald-400">{metrics.tokensSaved}</span>
+                  </div>
+                  <div className="pt-3 border-t border-slate-800 space-y-2 text-xs font-mono">
+                    <div className="flex justify-between"><span className="text-slate-500">Prompt Tokens</span><span>{metrics.promptTokens}</span></div>
+                    <div className="flex justify-between"><span className="text-slate-500">Completion Tokens</span><span>{metrics.completionTokens}</span></div>
+                    <div className="flex justify-between"><span className="text-slate-500">Total Tokens</span><span>{metrics.totalTokens}</span></div>
                   </div>
                 </div>
+
+                <a href={metrics.traceUrl} target="_blank" rel="noreferrer" className="flex items-center justify-between gap-3 bg-[#0B0F19] p-4 rounded-xl border border-slate-800 text-xs hover:border-cyan-500/60 transition-colors">
+                  <span className="text-slate-500 uppercase tracking-wider">Langfuse Trace ID</span>
+                  <span className="flex items-center gap-2 font-mono text-cyan-400 truncate"><span className="truncate">{metrics.traceId}</span><ExternalLink size={13} /></span>
+                </a>
               </div>
             ) : (
               <div className="text-center text-slate-600 py-12"><ShieldCheck className="mx-auto h-10 w-10 opacity-20 mb-3" /><p className="text-xs uppercase tracking-widest">Awaiting First Query</p></div>
